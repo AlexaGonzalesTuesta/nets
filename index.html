@@ -729,13 +729,20 @@ function parseVcf(text){
   return out;
 }
 function importContacts(list){
-  const seen=new Set(S.contacts.map(c=>(c.n+"|"+c.h).toLowerCase())); let added=0;
-  const byKey=new Map(S.contacts.map(c=>[(c.n+"|"+c.h).toLowerCase(), c]));
-  list.forEach(([n,h,tel])=>{ const c=newContact("c"+uid(), n, h); const key=(c.n+"|"+c.h).toLowerCase(); if (!c.n) return;
-    if (seen.has(key)){ const ex=byKey.get(key); if (ex && !ex.tel && tel) { ex.tel=tel; S.phonesAdded=(S.phonesAdded||0)+1; } return; }
-    c.tel=tel||""; seen.add(key); byKey.set(key,c); S.contacts.push(c); added++; });
+  const byKey=new Map(), byName=new Map();
+  S.contacts.forEach(c=>{ byKey.set((c.n+"|"+c.h).toLowerCase(), c); const nk=c.n.toLowerCase(); byName.set(nk, byName.has(nk)?null:c); });
+  let added=0, phones=0;
+  list.forEach(([n,h,tel])=>{ const c=newContact("c"+uid(), n, h); if (!c.n) return; const key=(c.n+"|"+c.h).toLowerCase();
+    const ex = byKey.get(key) || byName.get(c.n.toLowerCase());
+    if (ex){ if (tel && !ex.tel){ ex.tel=tel; phones++; } return; }
+    c.tel=tel||""; if (tel) phones++; byKey.set(key,c); S.contacts.push(c); added++; });
+  S.lastImport={added, phones, at:Date.now()};
   return added;
 }
+function importSummary(){ const L=S.lastImport||{added:0,phones:0}; const parts=[];
+  if (L.added) parts.push(`Added ${L.added} contact${L.added===1?"":"s"}`);
+  if (L.phones) parts.push(`${L.added?"saved":"Saved"} ${L.phones} phone number${L.phones===1?"":"s"}`);
+  return parts.length ? parts.join(", ") : "Everything was already up to date"; }
 function readContactsFile(file, done){
   const r=new FileReader();
   r.onload=()=>{ const list=parseVcf(r.result); done(list.length ? importContacts(list) : -1); };
@@ -760,7 +767,7 @@ function renderPermission(msg){
   </div></section>`;
   document.getElementById("vcfin").onchange=e=>{ const f=e.target.files && e.target.files[0]; if (!f) return;
     readContactsFile(f, n=>{ if (n<0) return renderPermission("That file doesn't look like a contacts file. Try exporting it again.");
-      S.stage="sort"; save(); renderSort(); toast("Imported "+n+" contacts"); }); };
+      S.stage="sort"; save(); renderSort(); toast(importSummary()); }); };
   document.getElementById("skipimport").onclick=()=>{ S.stage="app"; S.tab="contacts"; S.roundTwo=true; save(); render(); toast("Tap + to add your first person"); };
 }
 
@@ -996,6 +1003,11 @@ function homeHTML(){
   const hr = new Date(now()).getHours();
   const prog = tracked().filter(c=>c.prog).sort((a,b)=>a.prog.since-b.prog.since);
   let h = `<div class="hello"><h1>${hr<12?"Good morning":hr<18?"Good afternoon":"Good evening"}, Alexa</h1><p class="muted">Just start the conversation. We'll remember the rest.</p></div>`;
+  const tr=tracked(), withTel=tr.filter(c=>c.tel).length;
+  if (tr.length && withTel < tr.length/4 && !S.telPromptHidden)
+    h += `<div class="card" style="margin-top:22px;box-shadow:0 0 0 2px var(--accent-soft), var(--shadow)"><b style="font-family:var(--display);font-size:17px">Add everyone's phone number</b>
+      <p class="small muted" style="margin-top:4px">Pick your contacts file one more time so Text and Call work. Your sorting, notes, and logs stay exactly the same.</p>
+      <div class="row" style="margin-top:12px"><label class="btn btn-primary btn-sm">Choose contacts file<input type="file" id="vcfhome" class="sr"></label><button class="btn btn-soft btn-sm" id="telLater" type="button" style="flex:0 0 auto">Later</button></div></div>`;
   if (S.pending && Date.now()-S.pending.at < 86400000 && byId(S.pending.id)){ const pc=byId(S.pending.id), verb=S.pending.kind==="Called"?"call":"text";
     h += `<div class="pendingbar nudge-target" role="status"><div class="who">${av(pc," sm")}<div style="min-width:0"><b>Did you ${verb} ${esc(first(pc.n))}?</b><span>Log it while it's fresh so Nets can keep your queue right.</span></div></div>
       <div class="row"><button class="btn btn-primary btn-sm" id="plog" type="button">Yes, log it</button><button class="btn btn-soft btn-sm" id="pclear" type="button">Not yet</button></div></div>`; }
@@ -1232,7 +1244,7 @@ function settingsHTML(){
       <div class="chips" style="margin-top:10px" role="group" aria-label="Texting app"><button type="button" class="chip" data-textapp="sms" aria-pressed="${S.textApp!=="whatsapp"}">Messages</button><button type="button" class="chip" data-textapp="whatsapp" aria-pressed="${S.textApp==="whatsapp"}">WhatsApp</button></div>
       ${tracked().some(c=>c.tel)?"":`<p class="small" style="margin-top:10px;color:var(--warn);font-weight:700">No phone numbers yet. Tap Import contacts above and pick your contacts file again. Nets adds the numbers without changing your sorting.</p>`}</div></div>
     <div class="set-group"><h3>Daily reminder</h3><div class="set-card">${remindersHTML()}</div></div>
-    <div class="set-group"><h3>Privacy</h3><div class="set-card"><p class="small">Your contacts and notes stay on this device. Nets has no account and no server.</p></div></div>
+    <div class="set-group"><h3>Privacy</h3><div class="set-card"><p class="small">Your contacts and notes stay on this device. Nets has no account and no server.</p><p class="small muted" style="margin-top:8px">Nets version 5 · ${S.contacts.filter(c=>c.tel).length} phone numbers saved</p></div></div>
     <div class="set-group"><details class="tools"><summary>Testing tools</summary><div class="set-card" style="margin-top:8px">
       <p class="small muted" style="margin-bottom:12px">Jumping ahead moves the date for everything you log, so use it only to preview. Simulated date: <b style="color:var(--ink)">${new Date(now()).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</b></p>
       <div class="row" style="flex-wrap:wrap"><button class="btn btn-soft btn-sm" id="skipweek" type="button">Jump ahead 1 week</button><button class="btn btn-soft btn-sm" id="skipmonth" type="button">Jump ahead 1 month</button></div>
@@ -1452,7 +1464,9 @@ function wireApp(){
   if ($("pushunlink")) $("pushunlink").onclick=()=>{ S.pushLinked=false; save(); keepScroll(renderApp); };
   if ($("pushtest")) $("pushtest").onclick=async()=>{ try { const reg=await navigator.serviceWorker.ready; const d=reminderData(); await reg.showNotification(d.due.length?`Time to reach out to ${d.due[0].n}`:"Nets", {body: d.due.length?`${d.due[0].n} is due this week. A quick message is a great start.`:"This is what your daily reminder will look like.", icon:"icon-192.png", tag:"nets-test"}); toast("Test sent"); } catch(_){ toast("Couldn't show a notification"); } };
   if ($("backtoday")) $("backtoday").onclick=()=>{ S.offset=0; S.pool=null; save(); renderApp(); toast("Back to today"); };
-  if ($("vcfmore")) $("vcfmore").onchange=e=>{ const f=e.target.files && e.target.files[0]; if (!f) return; readContactsFile(f, n=>{ if (n<0) return toast("That isn't a contacts file"); save(); renderApp(); toast(n ? "Added "+n+" new contacts" : "No new contacts found"); }); };
+  if ($("vcfmore")) $("vcfmore").onchange=e=>{ const f=e.target.files && e.target.files[0]; if (!f) return; readContactsFile(f, n=>{ if (n<0) return toast("That isn't a contacts file"); save(); renderApp(); toast(importSummary()); }); };
+  if ($("vcfhome")) $("vcfhome").onchange=e=>{ const f=e.target.files && e.target.files[0]; if (!f) return; readContactsFile(f, n=>{ if (n<0) return toast("That isn't a contacts file"); save(); renderApp(); toast(importSummary()); }); };
+  if ($("telLater")) $("telLater").onclick=()=>{ S.telPromptHidden=true; save(); renderApp(); };
   if ($("backup")) $("backup").onclick=()=>{
     const name="nets-backup-"+dayStr(Date.now())+".json", data=JSON.stringify(S);
     let file=null; try { file=new File([data], name, {type:"application/json"}); } catch(_){}
