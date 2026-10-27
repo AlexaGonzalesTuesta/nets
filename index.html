@@ -218,7 +218,7 @@ p{margin:0}
 .sec-head h2{font-size:20px}
 .sec-sub{font-size:13px;color:var(--muted);margin:6px 0 14px}
 .timeleft{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--gold);background:var(--gold-soft);border-radius:999px;padding:2px 10px;white-space:nowrap}
-.carousel{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -22px;padding:4px 22px 16px;scrollbar-width:none}
+.carousel{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:0 22px;margin:0 -22px;padding:4px 22px 16px;scrollbar-width:none}
 .carousel::-webkit-scrollbar{display:none}
 .pick{flex:none;width:82%;scroll-snap-align:start;display:flex;flex-direction:column}
 .carousel.one .pick{width:100%}
@@ -404,12 +404,31 @@ img{max-width:100%}
 .onboard .progress{top:calc(34px + env(safe-area-inset-top,0px))}
 .onboard .skip{top:calc(48px + env(safe-area-inset-top,0px))}
 .onboard .hint{bottom:calc(36px + env(safe-area-inset-bottom,0px))}
-.nav{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+.nav{bottom:max(12px, calc(env(safe-area-inset-bottom,0px) - 8px))}
 .scroll{padding-bottom:calc(130px + env(safe-area-inset-bottom,0px))}
 .toast{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 .steps{margin:8px 0 0;padding-left:20px;display:grid;gap:8px;font-size:14px}
 details.tools summary{cursor:pointer;font-weight:800;color:var(--muted);font-size:13px;list-style:none}
 details.tools summary::-webkit-details-marker{display:none}
+
+@media (max-width:599px), (max-height:719px){
+  body{background:var(--bg2)}
+  .app{position:fixed;top:0;right:0;bottom:0;left:0;max-width:none;width:auto;height:auto}
+}
+.quick{display:flex;gap:8px;margin-top:12px}
+.qbtn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;padding:9px 12px;font-weight:800;font-size:14px;text-decoration:none;background:var(--surface);color:var(--accent-text);border:1.5px solid var(--line)}
+.qbtn:active{transform:scale(.97)}
+@keyframes shake{0%,100%{transform:translateX(0)}12%{transform:translateX(-8px) rotate(-1.2deg)}26%{transform:translateX(7px) rotate(1deg)}40%{transform:translateX(-6px)}54%{transform:translateX(5px)}68%{transform:translateX(-3px)}82%{transform:translateX(2px)}}
+.shake{animation:shake .75s ease 2}
+.pending{box-shadow:0 0 0 3px var(--accent), var(--shadow)!important}
+.pendingbar{margin-top:22px;background:var(--surface);border-radius:22px;box-shadow:0 0 0 3px var(--accent), var(--shadow);padding:14px 16px;display:grid;gap:12px}
+.pendingbar .who{gap:12px}
+.pendingbar b{display:block;font-family:var(--display);font-size:17px}
+.pendingbar span{font-size:13px;color:var(--muted)}
+.phonerow{display:flex;align-items:center;gap:10px;margin-top:12px;font-weight:700;flex-wrap:wrap}
+.phonerow .num{font-variant-numeric:tabular-nums}
+.codebox{width:100%;min-height:90px;font-family:ui-monospace, Menlo, monospace;font-size:11px;border:1.5px solid var(--line);border-radius:14px;padding:10px;background:var(--surface-2);word-break:break-all}
+@media (prefers-reduced-motion:reduce){.shake{animation:none}}
 </style>
 </head>
 <body>
@@ -476,7 +495,7 @@ function freshState(){
 let S;
 try { S = JSON.parse(localStorage.getItem(STORE_KEY)) } catch(e) { S = null }
 if (!S || S.v !== 3) S = freshState();
-function save(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(S)) } catch(e) {} }
+function save(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(S)) } catch(e) {} if (typeof writeReminder==="function") writeReminder(); }
 
 const now = () => Date.now() + S.offset*DAY;
 const byId = id => S.contacts.find(c=>c.id===id);
@@ -536,6 +555,17 @@ const icons = {
 };
 const goalIcon = g => g===3?icons.meet:g===2?icons.phone:icons.msg;
 function av(c, size){ return `<div class="avatar${size||""}">${c.photo?`<img src="${c.photo}" alt="">`:esc(initials(c.n))}</div>`; }
+function telLinks(c){
+  const d=(c.tel||"").replace(/[^\d+]/g,""); if (d.length<7) return null;
+  let wa=d.replace(/\D/g,""); if (wa.length===10) wa="1"+wa;
+  return {text: S.textApp==="whatsapp" ? `whatsapp://send?phone=${wa}` : `sms:${d}`, call:`tel:${d}`, appName: S.textApp==="whatsapp" ? "WhatsApp" : "Text"};
+}
+function quickBtns(c){
+  const L=telLinks(c); if (!L) return "";
+  return `<div class="quick"><a class="qbtn" href="${L.text}" data-go="${c.id}|Texted">${icons.msg} ${L.appName}</a><a class="qbtn" href="${L.call}" data-go="${c.id}|Called">${icons.phone} Call</a></div>`;
+}
+const pendingFor = id => S.pending && S.pending.id===id && Date.now()-S.pending.at < 86400000;
+function fmtTel(t){ const d=(t||"").replace(/\D/g,""); if (d.length===10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`; if (d.length===11 && d[0]==="1") return `+1 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`; return t; }
 function lastLogOf(c){ return c.log.reduce((a,l)=>!a||l.t>a.t?l:a, null); }
 const logDate = l => l.noDate ? "Date not set" : fmtDate(l.t);
 
@@ -685,12 +715,13 @@ function parseVcf(text){
   const out=[]; let cur=null;
   for (const raw of lines){
     const line=raw.trim(); if (!line) continue; const up=line.toUpperCase();
-    if (up==="BEGIN:VCARD"){ cur={fn:"",n:"",org:"",note:""}; continue; }
-    if (up==="END:VCARD"){ if (cur){ const name=cur.fn||cur.n; if (name) out.push([name, cur.org || (cur.note.length<=40?cur.note:"")]); } cur=null; continue; }
+    if (up==="BEGIN:VCARD"){ cur={fn:"",n:"",org:"",note:"",tel:"",telRank:0}; continue; }
+    if (up==="END:VCARD"){ if (cur){ const name=cur.fn||cur.n; if (name) out.push([name, cur.org || (cur.note.length<=40?cur.note:""), cur.tel]); } cur=null; continue; }
     if (!cur) continue;
     const k=line.indexOf(":"); if (k<0) continue;
     const key=line.slice(0,k).split(";")[0].split(".").pop().toUpperCase(), val=line.slice(k+1);
-    if (key==="FN") cur.fn=un(val);
+    if (key==="TEL"){ const params=line.slice(0,k).toUpperCase(); const rank=params.includes("PREF")?3:params.includes("CELL")?2:1; const num=val.replace(/[^\d+]/g,""); if (num.length>=7 && rank>cur.telRank){ cur.tel=num; cur.telRank=rank; } }
+    else if (key==="FN") cur.fn=un(val);
     else if (key==="N" && !cur.n){ const p=val.split(";").map(un); cur.n=[p[1],p[0]].filter(Boolean).join(" "); }
     else if (key==="ORG") cur.org=un(val.split(";").filter(x=>x.trim()).join(", "));
     else if (key==="NOTE") cur.note=un(val);
@@ -699,7 +730,10 @@ function parseVcf(text){
 }
 function importContacts(list){
   const seen=new Set(S.contacts.map(c=>(c.n+"|"+c.h).toLowerCase())); let added=0;
-  list.forEach(([n,h])=>{ const c=newContact("c"+uid(), n, h); const key=(c.n+"|"+c.h).toLowerCase(); if (!c.n || seen.has(key)) return; seen.add(key); S.contacts.push(c); added++; });
+  const byKey=new Map(S.contacts.map(c=>[(c.n+"|"+c.h).toLowerCase(), c]));
+  list.forEach(([n,h,tel])=>{ const c=newContact("c"+uid(), n, h); const key=(c.n+"|"+c.h).toLowerCase(); if (!c.n) return;
+    if (seen.has(key)){ const ex=byKey.get(key); if (ex && !ex.tel && tel) { ex.tel=tel; S.phonesAdded=(S.phonesAdded||0)+1; } return; }
+    c.tel=tel||""; seen.add(key); byKey.set(key,c); S.contacts.push(c); added++; });
   return added;
 }
 function readContactsFile(file, done){
@@ -896,11 +930,12 @@ function openEncourage(){
 function openAddPerson(name){
   sheet(`<h2>Add a person</h2><p class="small muted" style="margin-top:4px">For people who aren't in your phone contacts. They stay in Nets only.</p>
     <form id="apf"><div class="q"><label class="qlabel" for="apn">Name</label><input class="notefield" id="apn" required value="${esc(name||"")}" placeholder="e.g. Maria from study abroad"></div>
+    <div class="q"><label class="qlabel" for="apt">Phone number <span class="muted" style="font-weight:600">(optional)</span></label><input class="notefield" id="apt" type="tel" inputmode="tel" placeholder="e.g. (317) 555-0134"></div>
     <div class="q"><label class="qlabel" for="aph">How do you know them? <span class="muted" style="font-weight:600">(optional)</span></label><input class="notefield" id="aph" placeholder="e.g. Study abroad in Spain"></div>
     <div class="row" style="margin-top:20px"><button class="btn btn-soft" id="apc" type="button">Cancel</button><button class="btn btn-primary" type="submit">Add and sort</button></div></form>`, sc=>{
     sc.querySelector("#apc").onclick=()=>sc.remove();
     sc.querySelector("#apf").onsubmit=e=>{ e.preventDefault(); const n=sc.querySelector("#apn").value.trim(); if(!n) return;
-      const c=newContact("m"+uid(), n, sc.querySelector("#aph").value.trim(), true); S.contacts.unshift(c);
+      const c=newContact("m"+uid(), n, sc.querySelector("#aph").value.trim(), true); c.tel=sc.querySelector("#apt").value.replace(/[^\d+]/g,""); S.contacts.unshift(c);
       S.sortCurrent=c.id; draft=null; S.detail=null; S.encShown=true; if (S.stage==="app") S.stage="sortmore"; save(); sc.remove(); render(); toast(first(n)+" added"); };
     setTimeout(()=>sc.querySelector("#apn").focus(),50);
   });
@@ -961,15 +996,18 @@ function homeHTML(){
   const hr = new Date(now()).getHours();
   const prog = tracked().filter(c=>c.prog).sort((a,b)=>a.prog.since-b.prog.since);
   let h = `<div class="hello"><h1>${hr<12?"Good morning":hr<18?"Good afternoon":"Good evening"}, Alexa</h1><p class="muted">Just start the conversation. We'll remember the rest.</p></div>`;
+  if (S.pending && Date.now()-S.pending.at < 86400000 && byId(S.pending.id)){ const pc=byId(S.pending.id), verb=S.pending.kind==="Called"?"call":"text";
+    h += `<div class="pendingbar nudge-target" role="status"><div class="who">${av(pc," sm")}<div style="min-width:0"><b>Did you ${verb} ${esc(first(pc.n))}?</b><span>Log it while it's fresh so Nets can keep your queue right.</span></div></div>
+      <div class="row"><button class="btn btn-primary btn-sm" id="plog" type="button">Yes, log it</button><button class="btn btn-soft btn-sm" id="pclear" type="button">Not yet</button></div></div>`; }
   // Picks
   const allDone = reached >= S.perWeek;
   const pickCard = id => { const c=byId(id); if (!c) return ""; const isDone=loggedThisWeek(c);
-      return `<article class="card pick ${isDone?"done":""}">
+      return `<article class="card pick ${isDone?"done":""}${pendingFor(id)?" pending nudge-target":""}">
         <div class="top">${av(c," sm")}<div style="min-width:0;flex:1"><h3><button class="namebtn" data-open="${id}" type="button">${esc(c.n)}</button></h3>
           <div class="meta"><span class="pill">${CAT_LABEL[c.cat]}</span><span class="pill plain">${goalIcon(c.goal)} ${GOALS[c.goal]}</span></div></div></div>
         <div class="reason">${reasonFor(c)}</div>
         ${isDone ? `<p class="small" style="margin-top:14px;color:var(--ok);font-weight:800">${icons.check} Reached out this week</p>` :
-        `<div class="row"><button class="btn btn-primary btn-sm" data-reach="${id}" type="button">I reached out</button><button class="btn btn-soft btn-sm" data-swap="${id}" type="button">Swap</button></div>
+        `${quickBtns(c)}<div class="row"><button class="btn btn-primary btn-sm" data-reach="${id}" type="button">I reached out</button><button class="btn btn-soft btn-sm" data-swap="${id}" type="button">Swap</button></div>
          <button class="link helper" data-draft="${id}" type="button">${icons.pen} Help me start the message</button>`}
       </article>`; };
   const carousel = ids => `<div class="carousel ${ids.length===1?"one":""}">${ids.map(pickCard).join("")}</div>`;
@@ -994,6 +1032,7 @@ function homeHTML(){
       <p class="sec-sub">You opened the door. Log it here once the ${prog.length===1?GOALS[prog[0].goal].toLowerCase():"real time"} happens.</p><div class="prog">` +
       prog.map(c=>`<article class="progcard">${av(c," sm")}<div class="txt"><b><button class="namebtn" data-open="${c.id}" type="button">${esc(c.n)}</button></b>
         <span class="ht">${esc(c.prog.via)} ${ago(c.prog.since)}</span><br><span class="waiting"><i></i> Waiting on a ${GOALS[c.goal].toLowerCase()}</span></div>
+        <div style="grid-column:1 / -1">${quickBtns(c)}</div>
         <div class="row"><button class="btn btn-primary btn-sm" data-happened="${c.id}" type="button">The ${GOALS[c.goal].toLowerCase()} happened</button><button class="btn btn-soft btn-sm" data-unprog="${c.id}" type="button" style="flex:0 0 auto">Didn't happen</button></div></article>`).join("") + `</div></section>`;
   }
   // Up next
@@ -1001,13 +1040,13 @@ function homeHTML(){
     <p class="sec-sub">${due.length ? `${due.length} ${due.length===1?"person is":"people are"} due this week. Start at the top whenever you're ready.` : "No one is due this week."}</p>`;
   if (due.length){
     const c = due[0]; const lastLog = lastLogOf(c);
-    h += `<article class="card qtop"><div class="top">${av(c,"")}<div style="min-width:0;flex:1">
+    h += `<article class="card qtop${pendingFor(c.id)?" pending nudge-target":""}"><div class="top">${av(c,"")}<div style="min-width:0;flex:1">
         <h3><button class="namebtn" data-open="${c.id}" type="button">${esc(c.n)}</button></h3>
         <div class="meta"><span class="pill">${CAT_LABEL[c.cat]}</span>${dots(c.imp)}${statusPill(c)}</div></div></div>
       <div class="meta" style="margin-top:10px"><span class="pill plain">${goalIcon(c.goal)} Goal: ${GOALS[c.goal]}</span>${c.snoozeCount?`<span class="pill gold">Snoozed ${c.snoozeCount===1?"once":c.snoozeCount+" times"} before</span>`:""}</div>
       ${lastLog ? `<div class="lastnote"><span class="lbl">Last time · ${logDate(lastLog)} · ${esc(lastLog.type)}</span>${lastLog.note?esc(lastLog.note):'<span class="muted">No note added.</span>'}</div>`
         : `<div class="lastnote"><span class="lbl">First check-in</span><span class="muted">${c.h?`You know ${esc(first(c.n))} from ${esc(c.h)}. `:""}Nothing logged yet.</span></div>`}
-      <div class="row"><button class="btn btn-primary" data-reach="${c.id}" type="button">I reached out</button><button class="btn btn-soft" data-snooze="${c.id}" type="button">Snooze</button></div>
+      ${quickBtns(c)}<div class="row"><button class="btn btn-primary" data-reach="${c.id}" type="button">I reached out</button><button class="btn btn-soft" data-snooze="${c.id}" type="button">Snooze</button></div>
       <button class="link helper" data-draft="${c.id}" type="button">${icons.pen} Help me start the message</button>
     </article>`;
     const rest = due.slice(1,4).concat(due.length<4 ? later.slice(0, 4-due.length) : []);
@@ -1057,7 +1096,9 @@ function detailHTML(c){
   const t = isTracked(c), logs=[...c.log].sort((a,b)=>b.t-a.t);
   const backLabel = {queue:"Queue",home:"Home",settings:"Settings",calendar:"Calendar"}[S.detailFrom] || "Contacts";
   let h = `<button class="back" id="dback" type="button">${icons.back} ${backLabel}</button>
-    <div class="dhead"><div class="photo-wrap">${av(c," lg")}<label class="photo-btn" title="${c.photo?"Change photo":"Add photo"}">${icons.cam}<span class="sr">${c.photo?"Change photo":"Add photo"}</span><input type="file" id="photoin" accept="image/*" class="sr"></label></div><div style="min-width:0"><h1>${esc(c.n)}</h1>${c.h?`<span class="muted">${esc(c.h)}</span>`:""}${c.photo?`<div><button class="link" id="rmphoto" type="button" style="font-size:12px">Remove photo</button></div>`:""}</div></div>`;
+    <div class="dhead"><div class="photo-wrap">${av(c," lg")}<label class="photo-btn" title="${c.photo?"Change photo":"Add photo"}">${icons.cam}<span class="sr">${c.photo?"Change photo":"Add photo"}</span><input type="file" id="photoin" accept="image/*" class="sr"></label></div><div style="min-width:0"><h1>${esc(c.n)}</h1>${c.h?`<span class="muted">${esc(c.h)}</span>`:""}${c.photo?`<div><button class="link" id="rmphoto" type="button" style="font-size:12px">Remove photo</button></div>`:""}</div></div>
+    <form class="phonerow" id="telform">${c.tel && !S.editTel ? `<span class="muted">Phone</span> <span class="num">${esc(fmtTel(c.tel))}</span> <button class="link" id="teledit" type="button" style="font-size:13px">Edit</button>`
+      : `<label class="sr" for="telin">Phone number</label><input class="notefield" id="telin" type="tel" inputmode="tel" placeholder="Add a phone number" value="${esc(c.tel||"")}" style="flex:1;min-width:0;border-radius:999px"><button class="btn btn-soft btn-sm" type="submit">Save</button>`}</form>`;
   if (t){
     h += `<div class="stats">
       <div class="stat"><div class="k">Category</div><div class="v">${CAT_LABEL[c.cat]}</div></div>
@@ -1069,6 +1110,7 @@ function detailHTML(c){
       <p class="small muted" style="margin-top:10px;text-align:center">${c.goal<3?`${esc(GOAL_HELP[c.goal])}. Hit it ${Math.max(0,3-streak(c))} more ${3-streak(c)===1?"time":"times"} in a row to unlock a promotion to ${GOALS[c.goal+1]}.`:`${esc(GOAL_HELP[3])}. This is the closest stage.`}</p></div>
     ${promoReady(c) ? `<div class="promo"><b>Ready for the next stage?</b><p>You've hit your ${GOALS[c.goal].toLowerCase()} goal with ${esc(first(c.n))} ${streak(c)} times in a row. Want to aim for a ${GOALS[c.goal+1].toLowerCase()} next time?</p>
       <div class="row" style="margin-top:10px"><button class="btn btn-primary btn-sm" id="promote" type="button">Promote to ${GOALS[c.goal+1]}</button><button class="btn btn-soft btn-sm" id="notyet" type="button">Not yet</button></div></div>`:""}
+    ${quickBtns(c)}
     <div class="row" style="margin-top:14px"><button class="btn btn-primary" data-reach="${c.id}" type="button">Log an interaction</button><button class="btn btn-soft" id="dedit" type="button">Edit</button></div>
     <button class="link helper" data-draft="${c.id}" type="button">${icons.pen} Help me start the message</button>`;
   } else {
@@ -1132,6 +1174,47 @@ function calendarHTML(){
 }
 
 /* ---------- Settings ---------- */
+const VAPID_PUBLIC = "BBLYmsv6V2wOHE4KaAaTeDtPJtFdelOoxGRjlt5by1E8UR8tDLP5uDuaWW5MMvPuMLFtbLnlV1ZUG7DSU1gGVrg";
+const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+function remindersHTML(){
+  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!isStandalone()) return `<p class="small">Open Nets from its home screen icon to turn on reminders. iPhone only allows notifications for apps added to the home screen.</p>`;
+  if (!supported) return `<p class="small">This phone's browser doesn't support notifications yet. Update iOS in Settings > General > Software Update.</p>`;
+  const perm = Notification.permission;
+  if (perm==="denied") return `<p class="small">Notifications are off for Nets. Turn them on in your iPhone Settings > Notifications > Nets, then come back here.</p>`;
+  if (!S.pushSub || perm!=="granted") return `<p class="small">Get a nudge every evening with who to reach out to.</p><button class="btn btn-primary btn-sm" id="pushon" type="button" style="margin-top:12px">Turn on reminders</button>`;
+  return `<p class="small"><b>Notifications are allowed.</b> ${S.pushLinked?"Your daily reminder is set up.":"One last step: copy this code into GitHub as the secret named PUSH_SUBSCRIPTION."}</p>
+    ${S.pushLinked?"":`<label class="sr" for="subcode">Reminder code</label><textarea class="codebox" id="subcode" readonly style="margin-top:10px">${esc(S.pushSub)}</textarea>`}
+    <div class="row" style="flex-wrap:wrap;margin-top:10px">${S.pushLinked?"":`<button class="btn btn-primary btn-sm" id="copysub" type="button">Copy code</button>`}<button class="btn btn-soft btn-sm" id="pushtest" type="button">Send a test notification</button>
+    ${S.pushLinked?`<button class="btn btn-ghost btn-sm" id="pushunlink" type="button">Show code again</button>`:`<button class="btn btn-soft btn-sm" id="pushdone" type="button">I added it to GitHub</button>`}</div>`;
+}
+function b64uToU8(s){ const p="=".repeat((4-s.length%4)%4); const b=atob((s+p).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(b, ch=>ch.charCodeAt(0)); }
+async function turnOnPush(){
+  const perm = await Notification.requestPermission();
+  if (perm!=="granted"){ renderApp(); return toast("Notifications weren't allowed"); }
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uToU8(VAPID_PUBLIC)});
+  S.pushSub = JSON.stringify(sub); S.pushLinked=false; save(); writeReminder(); renderApp(); toast("Notifications allowed");
+}
+function reminderData(){
+  const {due} = queueOrder(); const p=S.pool||{ids:[]};
+  const picksLeft = p.ids.map(byId).filter(c=>c && !loggedThisWeek(c)).map(c=>first(c.n));
+  return {v:1, updated:Date.now(), perWeek:S.perWeek, reached:reachedThisWeek().length, weekEnd:weekEnd(),
+    due: due.slice(0,6).map(c=>({n:first(c.n), goal:GOALS[c.goal].toLowerCase()})),
+    later: queueOrder().later.slice(0,10).map(c=>({n:first(c.n), at:dueAt(c), goal:GOALS[c.goal].toLowerCase()})),
+    picks: picksLeft};
+}
+let remT=0;
+function writeReminder(){
+  clearTimeout(remT);
+  remT=setTimeout(()=>{ try{
+    if (S.stage!=="app") return;
+    const data=reminderData();
+    if (window.caches) caches.open("nets-data").then(c=>c.put("reminder", new Response(JSON.stringify(data),{headers:{"Content-Type":"application/json"}}))).catch(()=>{});
+    if (navigator.setAppBadge) { const n=data.due.length; (n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{}); }
+  }catch(e){} }, 400);
+}
 function settingsHTML(){
   const u=unsorted().length;
   return `<h1 style="font-size:25px;margin-top:16px">Settings</h1>
@@ -1145,6 +1228,10 @@ function settingsHTML(){
     <div class="set-group"><h3>Your data</h3><div class="set-card"><p class="small">Nets saves everything on this phone only. Back up now and then so you never lose your notes.</p>
       <div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn btn-soft btn-sm" id="backup" type="button">Back up</button><label class="btn btn-soft btn-sm">Restore a backup<input type="file" id="restorein" class="sr"></label></div></div></div>
     <div class="set-group"><h3>How reaching out works</h3><div class="set-card"><p class="small">Anything counts as long as <b>you</b> started it. Each person has a goal: a message, a call, or meeting up. Only an interaction that meets their goal resets their timer. If you've reached out to set up a call or meet-up, mark it In progress and log it once it happens. After three goal-hits in a row, Nets suggests promoting them to the next stage.</p></div></div>
+    <div class="set-group"><h3>Texting app</h3><div class="set-card"><p class="small muted">Which app opens when you tap Text on someone's card.</p>
+      <div class="chips" style="margin-top:10px" role="group" aria-label="Texting app"><button type="button" class="chip" data-textapp="sms" aria-pressed="${S.textApp!=="whatsapp"}">Messages</button><button type="button" class="chip" data-textapp="whatsapp" aria-pressed="${S.textApp==="whatsapp"}">WhatsApp</button></div>
+      ${tracked().some(c=>c.tel)?"":`<p class="small" style="margin-top:10px;color:var(--warn);font-weight:700">No phone numbers yet. Tap Import contacts above and pick your contacts file again. Nets adds the numbers without changing your sorting.</p>`}</div></div>
+    <div class="set-group"><h3>Daily reminder</h3><div class="set-card">${remindersHTML()}</div></div>
     <div class="set-group"><h3>Privacy</h3><div class="set-card"><p class="small">Your contacts and notes stay on this device. Nets has no account and no server.</p></div></div>
     <div class="set-group"><details class="tools"><summary>Testing tools</summary><div class="set-card" style="margin-top:8px">
       <p class="small muted" style="margin-bottom:12px">Jumping ahead moves the date for everything you log, so use it only to preview. Simulated date: <b style="color:var(--ink)">${new Date(now()).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</b></p>
@@ -1216,7 +1303,7 @@ function openLog(id, presetType, presetDay){
     sc.querySelector("#lcancel").onclick=()=>sc.remove();
     sc.querySelector("#lsave").onclick=()=>{
       keep(); const level=HOW_LEVEL[type]; const {t, noDate}=resolveDate(dmode, day); const prevM=c.lastM||0;
-      c.log.push({id:uid(), t, noDate, type, note:note.trim(), level, goal:c.goal}); recompute(c);
+      c.log.push({id:uid(), t, noDate, type, note:note.trim(), level, goal:c.goal}); recompute(c); if (S.pending && S.pending.id===c.id) S.pending=null;
       let msg;
       if (level>=c.goal){ if (t>=prevM){ c.snoozeCount=0; c.snoozeUntil=0; c.prog=null; } msg="Logged. Nice work."; }
       else if (markProg){ c.prog={since:t, via:type}; msg=first(c.n)+" moved to In progress"; }
@@ -1353,6 +1440,17 @@ function wireApp(){
   if ($("calprev")) $("calprev").onclick=()=>{ S.calMonth--; S.calDay=null; save(); renderApp(); };
   if ($("calnext")) $("calnext").onclick=()=>{ S.calMonth++; S.calDay=null; save(); renderApp(); };
   app.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ S.calDay = S.calDay===b.dataset.day ? null : b.dataset.day; save(); keepScroll(renderApp); });
+  app.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",()=>{ const [id,kind]=a.dataset.go.split("|"); S.pending={id, kind, at:Date.now()}; save(); }));
+  if ($("plog")) $("plog").onclick=()=>openLog(S.pending.id, S.pending.kind);
+  if ($("pclear")) $("pclear").onclick=()=>{ S.pending=null; save(); renderApp(); };
+  if ($("teledit")) $("teledit").onclick=()=>{ S.editTel=true; keepScroll(renderApp); const i=$("telin"); i && i.focus(); };
+  if ($("telform")) $("telform").onsubmit=e=>{ e.preventDefault(); const i=$("telin"); if (!i) return; const c=byId(S.detail); c.tel=i.value.replace(/[^\d+]/g,""); S.editTel=false; save(); keepScroll(renderApp); toast(c.tel?"Number saved":"Number removed"); };
+  app.querySelectorAll("[data-textapp]").forEach(b=>b.onclick=()=>{ S.textApp=b.dataset.textapp; save(); keepScroll(renderApp); });
+  if ($("pushon")) $("pushon").onclick=()=>{ turnOnPush().catch(err=>{ toast("Couldn't turn on reminders"); console.error(err); }); };
+  if ($("copysub")) $("copysub").onclick=()=>{ const ta=$("subcode"); try { navigator.clipboard.writeText(S.pushSub).then(()=>toast("Copied"), ()=>{ ta.select(); toast("Select all and copy"); }); } catch(_){ ta.select(); } };
+  if ($("pushdone")) $("pushdone").onclick=()=>{ S.pushLinked=true; save(); keepScroll(renderApp); toast("Daily reminder set"); };
+  if ($("pushunlink")) $("pushunlink").onclick=()=>{ S.pushLinked=false; save(); keepScroll(renderApp); };
+  if ($("pushtest")) $("pushtest").onclick=async()=>{ try { const reg=await navigator.serviceWorker.ready; const d=reminderData(); await reg.showNotification(d.due.length?`Time to reach out to ${d.due[0].n}`:"Nets", {body: d.due.length?`${d.due[0].n} is due this week. A quick message is a great start.`:"This is what your daily reminder will look like.", icon:"icon-192.png", tag:"nets-test"}); toast("Test sent"); } catch(_){ toast("Couldn't show a notification"); } };
   if ($("backtoday")) $("backtoday").onclick=()=>{ S.offset=0; S.pool=null; save(); renderApp(); toast("Back to today"); };
   if ($("vcfmore")) $("vcfmore").onchange=e=>{ const f=e.target.files && e.target.files[0]; if (!f) return; readContactsFile(f, n=>{ if (n<0) return toast("That isn't a contacts file"); save(); renderApp(); toast(n ? "Added "+n+" new contacts" : "No new contacts found"); }); };
   if ($("backup")) $("backup").onclick=()=>{
@@ -1373,6 +1471,10 @@ function wireApp(){
 }
 
 S.contacts.forEach(c=>c.log.forEach(l=>{ if (!l.id) l.id=uid(); })); save();
+function nudge(){ setTimeout(()=>{ document.querySelectorAll(".nudge-target").forEach(el=>{ el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }); try{ navigator.vibrate && navigator.vibrate([30,60,30]); }catch(_){} }, 350); }
+function checkPending(){ if (S.stage==="app" && S.pending && Date.now()-S.pending.at < 86400000 && byId(S.pending.id)){ S.tab="home"; S.detail=null; S.view=null; renderApp(); const m=document.getElementById("mainscroll"); if (m) m.scrollTop=0; nudge(); } }
+document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState==="visible"){ checkPending(); writeReminder(); } });
+setTimeout(checkPending, 50);
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e) {}
 if ("serviceWorker" in navigator) addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 render();

@@ -1,0 +1,26 @@
+name: Nets daily reminder
+
+on:
+  schedule:
+    # 22:30 UTC = 6:30 PM in Indianapolis during daylight time, 5:30 PM after clocks fall back.
+    - cron: "30 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send reminder
+        env:
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: |
+          npm install --no-save --silent web-push@3.6.7
+          node -e '
+            const webpush = require("web-push");
+            webpush.setVapidDetails("mailto:nets@users.noreply.github.com", "BBLYmsv6V2wOHE4KaAaTeDtPJtFdelOoxGRjlt5by1E8UR8tDLP5uDuaWW5MMvPuMLFtbLnlV1ZUG7DSU1gGVrg", process.env.VAPID_PRIVATE_KEY);
+            const sub = JSON.parse(process.env.PUSH_SUBSCRIPTION);
+            webpush.sendNotification(sub, null, { TTL: 43200 })
+              .then(r => console.log("Sent", r.statusCode))
+              .catch(e => { console.error("Failed", e.statusCode, e.body); process.exit(1); });
+          '
