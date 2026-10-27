@@ -330,10 +330,14 @@ p{margin:0}
 
 /* Sheets */
 .scrim{position:absolute;inset:0;background:rgba(40,28,90,.38);z-index:40;display:flex;align-items:flex-end}
-.sheet{width:100%;background:var(--surface);border-radius:28px 28px 0 0;padding:10px 22px calc(24px + env(safe-area-inset-bottom,0px));max-height:92%;overflow-y:auto;animation:slideUp .35s cubic-bezier(.2,.8,.2,1) both}
+.sheet{width:100%;background:var(--surface);border-radius:28px 28px 0 0;padding:0 22px calc(24px + env(safe-area-inset-bottom,0px));max-height:92%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;animation:slideUp .35s cubic-bezier(.2,.8,.2,1) backwards;will-change:transform}
+.sheet.full{height:92%}
+.scrim{transition:background .25s ease}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
-.grab{width:42px;height:5px;border-radius:5px;background:var(--line);margin:0 auto 14px}
+.grab{position:sticky;top:0;z-index:3;height:30px;margin:0 -22px 8px;display:flex;align-items:center;justify-content:center;background:var(--surface);touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+.grab::before{content:"";width:44px;height:5px;border-radius:5px;background:#CFC8EA}
+.grab:active{cursor:grabbing}
 .sheet h2{font-size:21px}
 textarea{width:100%;min-height:100px;border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--surface-2);resize:vertical;outline:none}
 textarea:focus{border-color:var(--accent)}
@@ -429,6 +433,17 @@ details.tools summary::-webkit-details-marker{display:none}
 .phonerow .num{font-variant-numeric:tabular-nums}
 .codebox{width:100%;min-height:90px;font-family:ui-monospace, Menlo, monospace;font-size:11px;border:1.5px solid var(--line);border-radius:14px;padding:10px;background:var(--surface-2);word-break:break-all}
 @media (prefers-reduced-motion:reduce){.shake{animation:none}}
+
+@keyframes swapIn{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
+textarea.swap{animation:swapIn .3s ease}
+.celebrate .x{position:absolute;top:10px;right:10px;color:#FFFFFF;font-size:22px;padding:6px 10px;z-index:2}
+.celebrate .actions{display:flex;gap:8px;margin-top:16px;position:relative;flex-wrap:wrap}
+.celebrate .actions .btn{margin:0}
+.btn-white{background:#FFFFFF;color:var(--accent-text)}
+.btn-glass{background:rgba(255,255,255,.18);color:#FFFFFF}
+.stretch-tag{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800;background:linear-gradient(90deg,#FFE7B3,#FFD1E8);color:#7A3E00}
+.pick.stretch{box-shadow:0 0 0 2px #F6C77A, var(--shadow)}
+.goalpill{display:inline-flex;align-items:center;gap:5px}
 </style>
 </head>
 <body>
@@ -457,11 +472,33 @@ const HOW_LEVEL = Object.fromEntries(HOW);
 const GOAL_HOW = {1:"Texted",2:"Called",3:"Met up"};
 const NB_SUGGEST = ["Notes","Important dates","Hobbies","Fun facts","Personality","Stories","Things they love","Conversation topics","Work and school","Family","Goals and plans"];
 const STARTERS = [
-  ["It's been a while", n=>`Hey ${n}! I know it's been a while. I've been trying to reconnect with people who matter to me, and you came to mind. How have you been?`],
-  ["Set up a call", n=>`Hey ${n}, it's been too long! Would you be up for a quick call sometime this week? I'd love to catch up.`],
-  ["Meet up", n=>`Hi ${n}! I'd love to see you. Want to grab coffee or lunch sometime soon?`],
-  ["Thought of you", n=>`Hey ${n}, I saw something today that made me think of you. How are things going?`],
-  ["Quick check-in", n=>`Hey ${n}, just checking in. How's everything going lately?`]
+  ["Reconnecting", [
+    n=>`Hey ${n}! I've been trying to reconnect with friends lately and you came to mind. How have you been doing?`,
+    n=>`Hi ${n}! I'm making an effort to reach back out to people I care about, and you were one of the first people I thought of. How's life been?`,
+    n=>`Hey ${n}, I realized it's been way too long. I'm trying to be better about keeping in touch, and I wanted to say hi. How are you doing?`,
+    n=>`${n}! You popped into my head today. I've been reconnecting with old friends and wanted to check in. What's new with you?`,
+    n=>`Hi ${n}, I've been thinking about the people who've mattered to me, and you're one of them. How have you been?`,
+    n=>`Hey ${n}! Random, I know, but I've been reaching out to friends I miss, and that includes you. How's everything going?`]],
+  ["It's been a while", [
+    n=>`Hey ${n}! I know it's been a while. You came to mind today. How have you been?`,
+    n=>`Hi ${n}! It's been forever. I'd love to hear what you've been up to lately.`,
+    n=>`${n}! Can't believe how long it's been. How are things with you?`]],
+  ["Set up a call", [
+    n=>`Hey ${n}, it's been too long! Would you be up for a quick call sometime this week? I'd love to catch up.`,
+    n=>`Hi ${n}! Any chance you're free for a call this week? I miss talking to you.`,
+    n=>`Hey ${n}, I'd love to hear your voice and catch up. Want to hop on a call sometime soon?`]],
+  ["Meet up", [
+    n=>`Hi ${n}! I'd love to see you. Want to grab coffee or lunch sometime soon?`,
+    n=>`Hey ${n}, are you around in the next couple of weeks? I'd love to get together and catch up.`,
+    n=>`${n}! We should hang out. Coffee, a walk, dinner, anything works for me. When are you free?`]],
+  ["Thought of you", [
+    n=>`Hey ${n}, I saw something today that made me think of you. How are things going?`,
+    n=>`Hi ${n}! Something reminded me of you today and it made me smile. How have you been?`,
+    n=>`${n}, you crossed my mind today. Hope you're doing well! What's new?`]],
+  ["Quick check-in", [
+    n=>`Hey ${n}, just checking in. How's everything going lately?`,
+    n=>`Hi ${n}! Hope your week's going well. How are you?`,
+    n=>`Hey ${n}, thinking of you. How's life treating you?`]]
 ];
 const STORE_KEY = "nets-app-v3";
 
@@ -924,15 +961,15 @@ function openSortInfo(){
     <p>Tap Skip for now and they'll come back at the end. Don't track hides people you don't need to reach, like a leasing office.</p>
     <h3>Take breaks</h3>
     <p>Your progress saves as you go. After 10 people you can start using Nets and come back to sorting from Settings whenever you want.</p>
-    <button class="btn btn-primary btn-block" id="infook" type="button" style="margin-top:22px">Back to sorting</button></div>`, sc=>{ sc.querySelector("#infook").onclick=()=>sc.remove(); });
+    <button class="btn btn-primary btn-block" id="infook" type="button" style="margin-top:22px">Back to sorting</button></div>`, sc=>{ sc.querySelector("#infook").onclick=()=>closeSheet(sc); });
 }
 function openEncourage(){
-  sheet(`<div class="encourage" style="margin:-10px -22px -24px;padding:24px 22px 28px;border-radius:28px 28px 0 0">
+  sheet(`<div class="encourage" style="margin:-8px -22px -24px;padding:20px 22px 28px">
     <p class="eyebrow">Round two</p><h2 style="margin-top:10px">Welcome back</h2>
     <p>Deciding who to skip or not track is the hardest part. It's normal to hesitate, and that hesitation is exactly what Nets is here to help you push through.</p>
     <p>This round, take the leap. Keep the people you're unsure about, and now and then try setting the goal to a call instead of a text. You might be surprised who's glad to hear from you.</p>
     <p class="muted">In the end, you know your people best. Do what feels right.</p>
-    <button class="btn btn-primary btn-block" id="encok" type="button" style="margin-top:20px">Let's do this</button></div>`, sc=>{ sc.querySelector("#encok").onclick=()=>sc.remove(); });
+    <button class="btn btn-primary btn-block" id="encok" type="button" style="margin-top:20px">Let's do this</button></div>`, sc=>{ sc.querySelector("#encok").onclick=()=>closeSheet(sc); });
 }
 function openAddPerson(name){
   sheet(`<h2>Add a person</h2><p class="small muted" style="margin-top:4px">For people who aren't in your phone contacts. They stay in Nets only.</p>
@@ -940,7 +977,7 @@ function openAddPerson(name){
     <div class="q"><label class="qlabel" for="apt">Phone number <span class="muted" style="font-weight:600">(optional)</span></label><input class="notefield" id="apt" type="tel" inputmode="tel" placeholder="e.g. (317) 555-0134"></div>
     <div class="q"><label class="qlabel" for="aph">How do you know them? <span class="muted" style="font-weight:600">(optional)</span></label><input class="notefield" id="aph" placeholder="e.g. Study abroad in Spain"></div>
     <div class="row" style="margin-top:20px"><button class="btn btn-soft" id="apc" type="button">Cancel</button><button class="btn btn-primary" type="submit">Add and sort</button></div></form>`, sc=>{
-    sc.querySelector("#apc").onclick=()=>sc.remove();
+    sc.querySelector("#apc").onclick=()=>closeSheet(sc);
     sc.querySelector("#apf").onsubmit=e=>{ e.preventDefault(); const n=sc.querySelector("#apn").value.trim(); if(!n) return;
       const c=newContact("m"+uid(), n, sc.querySelector("#aph").value.trim(), true); c.tel=sc.querySelector("#apt").value.replace(/[^\d+]/g,""); S.contacts.unshift(c);
       S.sortCurrent=c.id; draft=null; S.detail=null; S.encShown=true; if (S.stage==="app") S.stage="sortmore"; save(); sc.remove(); render(); toast(first(n)+" added"); };
@@ -1013,30 +1050,46 @@ function homeHTML(){
       <div class="row"><button class="btn btn-primary btn-sm" id="plog" type="button">Yes, log it</button><button class="btn btn-soft btn-sm" id="pclear" type="button">Not yet</button></div></div>`; }
   // Picks
   const allDone = reached >= S.perWeek;
-  const pickCard = id => { const c=byId(id); if (!c) return ""; const isDone=loggedThisWeek(c);
-      return `<article class="card pick ${isDone?"done":""}${pendingFor(id)?" pending nudge-target":""}">
+  const wk = weekKey(now());
+  // A stretch pick: someone important you haven't reached in a long time. Offered once the weekly goal is met.
+  if (allDone && p.stretchFor!==wk){
+    const ex=new Set([...p.ids, ...(p.swapped||[])]);
+    const cand=tracked().filter(c=>!ex.has(c.id) && !c.prog && (!c.last || now()-c.last>45*DAY) && !loggedThisWeek(c));
+    cand.sort((a,b)=>((b.last?now()-b.last:400*DAY)*b.imp)-((a.last?now()-a.last:400*DAY)*a.imp));
+    p.stretch = cand[0] ? cand[0].id : null; p.stretchFor=wk; save();
+  }
+  const pickCard = (id, stretch) => { const c=byId(id); if (!c) return ""; const isDone=loggedThisWeek(c);
+      const gap = c.last ? ago(c.last).replace(" ago","") : null;
+      return `<article class="card pick ${isDone?"done":""}${stretch?" stretch":""}${pendingFor(id)?" pending nudge-target":""}">
+        ${stretch?`<span class="stretch-tag" style="margin-bottom:10px">${icons.spark.replace('width="20" height="20"','width="12" height="12"')} Stretch pick</span>`:""}
         <div class="top">${av(c," sm")}<div style="min-width:0;flex:1"><h3><button class="namebtn" data-open="${id}" type="button">${esc(c.n)}</button></h3>
           <div class="meta"><span class="pill">${CAT_LABEL[c.cat]}</span><span class="pill plain">${goalIcon(c.goal)} ${GOALS[c.goal]}</span></div></div></div>
-        <div class="reason">${reasonFor(c)}</div>
+        <div class="reason">${stretch ? `<b>Outside your comfort zone</b>${gap?`It's been ${esc(gap)} since you reached ${esc(first(c.n))}.`:`You haven't logged anything with ${esc(first(c.n))} yet.`} A little nerve-wracking? That's the point. They'll probably be glad you did.` : reasonFor(c)}</div>
         ${isDone ? `<p class="small" style="margin-top:14px;color:var(--ok);font-weight:800">${icons.check} Reached out this week</p>` :
-        `${quickBtns(c)}<div class="row"><button class="btn btn-primary btn-sm" data-reach="${id}" type="button">I reached out</button><button class="btn btn-soft btn-sm" data-swap="${id}" type="button">Swap</button></div>
+        `${quickBtns(c)}<div class="row"><button class="btn btn-primary btn-sm" data-reach="${id}" type="button">I reached out</button>${stretch?"":`<button class="btn btn-soft btn-sm" data-swap="${id}" type="button">Swap</button>`}</div>
          <button class="link helper" data-draft="${id}" type="button">${icons.pen} Help me start the message</button>`}
       </article>`; };
-  const carousel = ids => `<div class="carousel ${ids.length===1?"one":""}">${ids.map(pickCard).join("")}</div>`;
-  h += `<section class="sec"><div class="sec-head"><h2>This week's picks</h2>${allDone?"":`<span style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill">${reached} of ${S.perWeek} reached</span><span class="timeleft">${icons.clock} ${daysLeftText()}</span></span>`}</div>`;
-  if (allDone){
-    const ppl = reachedThisWeek(), dl = Math.ceil((weekEnd()-now())/DAY);
+  const carousel = ids => `<div class="carousel ${ids.length===1?"one":""}" id="pickrow">${ids.map(x=>pickCard(x.id||x, x.stretch)).join("")}</div>`;
+  const stretchOn = allDone && p.stretch && byId(p.stretch) && !loggedThisWeek(byId(p.stretch));
+  const undone = p.ids.filter(id=>byId(id) && !loggedThisWeek(byId(id)));
+  const doneIds = p.ids.filter(id=>byId(id) && loggedThisWeek(byId(id)));
+  h += `<section class="sec" id="picksec"><div class="sec-head"><h2>This week's picks</h2><span style="display:flex;gap:6px;flex-wrap:wrap">${allDone
+      ? `<span class="pill ok goalpill">${icons.check} Goal reached</span><span class="pill">${reached} this week</span>`
+      : `<span class="pill">${reached} of ${S.perWeek} reached</span><span class="timeleft">${icons.clock} ${daysLeftText()}</span>`}</span></div>`;
+  if (allDone && S.celebDismissed!==wk){
+    const ppl = reachedThisWeek();
     const spk = [[14,78,0],[58,90,1.1],[22,62,2.2],[70,70,.6],[40,84,1.7]].map(([t,l,d])=>`<span class="spk" style="top:${t}%;left:${l}%;animation-delay:${d}s">${icons.spark}</span>`).join("");
-    h += `<div class="celebrate" role="status">${spk}<p class="big">Weekly goal reached</p><h3>All done for this week!</h3>
-      <p>${ppl.length===1?"Someone":ppl.length+" people"} heard from you this week. That's how connections come back, one hello at a time.</p>
+    h += `<div class="celebrate" role="status">${spk}<button class="x" id="celebx" type="button" aria-label="Dismiss">×</button>
+      <p class="big">Weekly goal reached</p><h3>You showed up for ${ppl.length===1?"someone":ppl.length+" people"} this week</h3>
+      <p>That's who you're becoming: the person who reaches out first. Your goal is the floor, not the ceiling.</p>
       <div class="donechips">${ppl.map(c=>`<button type="button" data-open="${c.id}">${av(c,"")}${esc(first(c.n))}</button>`).join("")}</div>
-      <p class="next">Fresh picks arrive ${dl<=1?"tomorrow":"in "+dl+" days"}.</p></div>`;
-    const extra = p.ids.filter(id=>byId(id) && !loggedThisWeek(byId(id)));
-    if (extra.length) h += `<p class="sec-sub" style="margin-top:18px">Feeling good? These are still here as a bonus.</p>${carousel(extra)}`;
-  } else {
-    h += `<p class="sec-sub">Reach out to any of these, or anyone in your queue. Both count toward your goal.</p>`;
-    h += p.ids.length ? carousel(p.ids) : `<div class="card empty" style="padding:22px"><p>No picks this week. Add people to your Someday list or sort more contacts.</p></div>`;
+      <div class="actions">${stretchOn?`<button class="btn btn-white btn-sm" id="celebgo" type="button">See my stretch pick</button>`:""}<button class="btn btn-glass btn-sm" id="celebok" type="button">Keep going</button></div></div>`;
   }
+  const show = [...(stretchOn?[{id:p.stretch, stretch:true}]:[]), ...undone, ...doneIds];
+  h += `<p class="sec-sub" style="${allDone && S.celebDismissed!==wk ? "margin-top:18px" : ""}">${allDone
+      ? (stretchOn ? "Bonus round. Your stretch pick is someone you haven't talked to in a while. Every extra hello shows up on your calendar." : "Bonus round. Every extra hello shows up on your calendar.")
+      : "Reach out to any of these, or anyone in your queue. Both count toward your goal."}</p>`;
+  h += show.length ? carousel(show) : `<div class="card empty" style="padding:22px"><p>No picks this week. Add people to your Someday list or sort more contacts.</p></div>`;
   h += `</section>`;
   // In progress
   if (prog.length){
@@ -1244,7 +1297,7 @@ function settingsHTML(){
       <div class="chips" style="margin-top:10px" role="group" aria-label="Texting app"><button type="button" class="chip" data-textapp="sms" aria-pressed="${S.textApp!=="whatsapp"}">Messages</button><button type="button" class="chip" data-textapp="whatsapp" aria-pressed="${S.textApp==="whatsapp"}">WhatsApp</button></div>
       ${tracked().some(c=>c.tel)?"":`<p class="small" style="margin-top:10px;color:var(--warn);font-weight:700">No phone numbers yet. Tap Import contacts above and pick your contacts file again. Nets adds the numbers without changing your sorting.</p>`}</div></div>
     <div class="set-group"><h3>Daily reminder</h3><div class="set-card">${remindersHTML()}</div></div>
-    <div class="set-group"><h3>Privacy</h3><div class="set-card"><p class="small">Your contacts and notes stay on this device. Nets has no account and no server.</p><p class="small muted" style="margin-top:8px">Nets version 5 · ${S.contacts.filter(c=>c.tel).length} phone numbers saved</p></div></div>
+    <div class="set-group"><h3>Privacy</h3><div class="set-card"><p class="small">Your contacts and notes stay on this device. Nets has no account and no server.</p><p class="small muted" style="margin-top:8px">Nets version 6 · ${S.contacts.filter(c=>c.tel).length} phone numbers saved</p></div></div>
     <div class="set-group"><details class="tools"><summary>Testing tools</summary><div class="set-card" style="margin-top:8px">
       <p class="small muted" style="margin-bottom:12px">Jumping ahead moves the date for everything you log, so use it only to preview. Simulated date: <b style="color:var(--ink)">${new Date(now()).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</b></p>
       <div class="row" style="flex-wrap:wrap"><button class="btn btn-soft btn-sm" id="skipweek" type="button">Jump ahead 1 week</button><button class="btn btn-soft btn-sm" id="skipmonth" type="button">Jump ahead 1 month</button></div>
@@ -1253,11 +1306,41 @@ function settingsHTML(){
 }
 
 /* ---------- Sheets ---------- */
+function closeSheet(scrim){
+  const sh=scrim.querySelector(".sheet"); if (!sh || scrim.dataset.closing) return; scrim.dataset.closing="1";
+  sh.style.transition="transform .26s cubic-bezier(.4,0,1,1)"; sh.style.transform="translateY(105%)"; scrim.style.background="rgba(40,28,90,0)";
+  setTimeout(()=>scrim.remove(), 260);
+}
+// Drag the handle down to close, or up to make the sheet taller. Pulling down from the top of the sheet's content works too.
+function enableSheetDrag(scrim){
+  const sh=scrim.querySelector(".sheet"); let y0=0, dy=0, t0=0, active=false, fromContent=false;
+  const begin=(y, content)=>{ active=true; fromContent=content; y0=y; dy=0; t0=performance.now(); sh.style.transition="none"; };
+  const move=y=>{ dy=y-y0; const shown = dy>0 ? dy : (sh.classList.contains("full") ? dy/6 : dy/2.5);
+    sh.style.transform=`translateY(${shown}px)`; scrim.style.background=`rgba(40,28,90,${(0.38*Math.max(0,1-Math.max(0,dy)/420)).toFixed(3)})`; };
+  const finish=()=>{ if (!active) return; active=false; const v=dy/Math.max(1,performance.now()-t0);
+    if (dy>110 || (dy>36 && v>0.55)){ draft=null; return closeSheet(scrim); }
+    sh.style.transition="transform .3s cubic-bezier(.2,.8,.2,1)";
+    if (dy<-40) sh.classList.add("full");
+    sh.style.transform=""; scrim.style.background=""; };
+  // Pointer drag on the handle
+  sh.addEventListener("pointerdown", e=>{ if (!e.target.closest(".grab")) return; e.preventDefault(); try{ sh.setPointerCapture(e.pointerId); }catch(_){} begin(e.clientY,false); });
+  sh.addEventListener("pointermove", e=>{ if (active && !fromContent) move(e.clientY); });
+  sh.addEventListener("pointerup", ()=>{ if (!fromContent) finish(); });
+  sh.addEventListener("pointercancel", ()=>{ if (!fromContent) finish(); });
+  // Touch pull-down from content when already scrolled to the top
+  let ty=0, tracking=false;
+  sh.addEventListener("touchstart", e=>{ if (e.target.closest(".grab") || e.target.closest("input,textarea,select")) return; ty=e.touches[0].clientY; tracking = sh.scrollTop<=0; }, {passive:true});
+  sh.addEventListener("touchmove", e=>{ if (!tracking) return; const y=e.touches[0].clientY;
+    if (!active){ if (y-ty>8 && sh.scrollTop<=0) begin(ty,true); else if (y<ty) { tracking=false; return; } else return; }
+    e.preventDefault(); move(y); }, {passive:false});
+  sh.addEventListener("touchend", ()=>{ tracking=false; if (fromContent) finish(); });
+  sh.addEventListener("touchcancel", ()=>{ tracking=false; if (fromContent) finish(); });
+}
 function sheet(inner, onMount){
   const scrim=document.createElement("div"); scrim.className="scrim";
-  scrim.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${inner}</div>`;
-  scrim.addEventListener("click", e=>{ if (e.target===scrim){ scrim.remove(); } });
-  app.appendChild(scrim); onMount && onMount(scrim); return scrim;
+  scrim.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><div class="grab" aria-hidden="true"></div>${inner}</div>`;
+  scrim.addEventListener("click", e=>{ if (e.target===scrim){ draft=null; closeSheet(scrim); } });
+  app.appendChild(scrim); enableSheetDrag(scrim); onMount && onMount(scrim); return scrim;
 }
 function dateUI(mode, day){
   const chips=[["today","Today"],["yesterday","Yesterday"],["pick","Pick a date"],["none","Add later"]];
@@ -1312,7 +1395,7 @@ function openLog(id, presetType, presetDay){
     sc.querySelectorAll("[data-lsec]").forEach(x=>x.onchange=()=>{ keep(); paint(); });
     sc.querySelectorAll("[data-lrm]").forEach(b=>b.onclick=()=>{ keep(); learns.splice(+b.dataset.lrm,1); paint(); });
     sc.querySelector("#laddrow").onclick=()=>{ keep(); const last=learns[learns.length-1]; learns.push({sec:last?last.sec:secNames[0], text:"", newSec:""}); paint(); const ni=sc.querySelector(`[data-ltext="${learns.length-1}"]`); ni && ni.focus(); };
-    sc.querySelector("#lcancel").onclick=()=>sc.remove();
+    sc.querySelector("#lcancel").onclick=()=>closeSheet(sc);
     sc.querySelector("#lsave").onclick=()=>{
       keep(); const level=HOW_LEVEL[type]; const {t, noDate}=resolveDate(dmode, day); const prevM=c.lastM||0;
       c.log.push({id:uid(), t, noDate, type, note:note.trim(), level, goal:c.goal}); recompute(c); if (S.pending && S.pending.id===c.id) S.pending=null;
@@ -1340,7 +1423,7 @@ function openLogEdit(cid, lid){
       <button class="btn btn-ghost btn-block" id="ldel" type="button" style="margin-top:6px;color:var(--warn)">${armed?"Tap again to delete":"Delete this interaction"}</button>`;
     sc.querySelectorAll("[data-how]").forEach(b=>b.onclick=()=>{ keep(); type=b.dataset.how; paint(); });
     wireDate(sc, keep, m=>{ dmode=m; if (m==="pick" && !day) day=dayStr(now()); }, paint);
-    sc.querySelector("#lcancel").onclick=()=>sc.remove();
+    sc.querySelector("#lcancel").onclick=()=>closeSheet(sc);
     sc.querySelector("#lsave").onclick=()=>{ keep();
       if (dmode==="none" || (dmode==="pick" && !day)) l.noDate=true; else { const r=resolveDate(dmode, day); l.t=r.t; l.noDate=false; }
       l.type=type; l.level=HOW_LEVEL[type]; l.note=note.trim(); recompute(c); save(); sc.remove(); const ms=document.getElementById("mainscroll"), top=ms?ms.scrollTop:0; renderApp(); const m2=document.getElementById("mainscroll"); if (m2) m2.scrollTop=top; toast("Saved"); };
@@ -1376,12 +1459,19 @@ function openDraft(id){
   const c=byId(id); const lastLog=lastLogOf(c);
   sheet(`<h2>Start the message</h2>
     <p class="small muted" style="margin-top:4px">${lastLog?`Last time: ${esc(lastLog.type.toLowerCase())} ${ago(lastLog.t)}.`:`You haven't logged anything with ${esc(first(c.n))} yet.`} Pick a starter or write your own, then copy it into your messaging app.</p>
-    <div class="chips" style="margin-top:14px">${STARTERS.map(([l],i)=>`<button type="button" class="chip" data-st="${i}">${l}</button>`).join("")}</div>
+    <div class="chips" style="margin-top:14px">${STARTERS.map(([l],i)=>`<button type="button" class="chip" data-st="${i}" aria-pressed="false">${l}</button>`).join("")}</div>
+    <p class="small muted" id="sthint" style="margin-top:8px">Tap a starter. Tap it again for another version.</p>
     <div class="q"><label class="qlabel" for="dtext">Your message</label><textarea id="dtext" placeholder="Hey ${esc(first(c.n))}!"></textarea></div>
     <div class="row" style="margin-top:16px"><button class="btn btn-soft" id="dclose" type="button">Close</button><button class="btn btn-primary" id="dcopy" type="button">Copy message</button></div>`, sc=>{
     const ta=sc.querySelector("#dtext");
-    sc.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>{ ta.value=STARTERS[+b.dataset.st][1](first(c.n)); ta.focus(); });
-    sc.querySelector("#dclose").onclick=()=>sc.remove();
+    const turn={}; let lastSt=null;
+    sc.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>{ const k=+b.dataset.st, vs=STARTERS[k][1];
+      turn[k] = lastSt===k ? ((turn[k]||0)+1)%vs.length : (turn[k]||0); lastSt=k;
+      ta.value=vs[turn[k]](first(c.n));
+      sc.querySelectorAll("[data-st]").forEach(x=>x.setAttribute("aria-pressed", x===b?"true":"false"));
+      sc.querySelector("#sthint").textContent = `Version ${turn[k]+1} of ${vs.length}. Tap "${STARTERS[k][0]}" again for another, or edit it below.`;
+      ta.classList.remove("swap"); void ta.offsetWidth; ta.classList.add("swap"); });
+    sc.querySelector("#dclose").onclick=()=>closeSheet(sc);
     sc.querySelector("#dcopy").onclick=()=>{
       if (!ta.value.trim()){ ta.focus(); return; }
       try { navigator.clipboard.writeText(ta.value).then(()=>toast("Copied"), ()=>{ ta.select(); toast("Press Ctrl+C to copy"); }); }
@@ -1453,6 +1543,9 @@ function wireApp(){
   if ($("calnext")) $("calnext").onclick=()=>{ S.calMonth++; S.calDay=null; save(); renderApp(); };
   app.querySelectorAll("[data-day]").forEach(b=>b.onclick=()=>{ S.calDay = S.calDay===b.dataset.day ? null : b.dataset.day; save(); keepScroll(renderApp); });
   app.querySelectorAll("[data-go]").forEach(a=>a.addEventListener("click",()=>{ const [id,kind]=a.dataset.go.split("|"); S.pending={id, kind, at:Date.now()}; save(); }));
+  if ($("celebx")) $("celebx").onclick=()=>{ S.celebDismissed=weekKey(now()); save(); keepScroll(renderApp); };
+  if ($("celebok")) $("celebok").onclick=()=>{ S.celebDismissed=weekKey(now()); save(); keepScroll(renderApp); };
+  if ($("celebgo")) $("celebgo").onclick=()=>{ S.celebDismissed=weekKey(now()); save(); renderApp(); const r=$("pickrow"); if (r){ r.scrollLeft=0; r.scrollIntoView({behavior:"smooth", block:"center"}); const first=r.querySelector(".pick"); if (first){ first.classList.add("shake"); } } };
   if ($("plog")) $("plog").onclick=()=>openLog(S.pending.id, S.pending.kind);
   if ($("pclear")) $("pclear").onclick=()=>{ S.pending=null; save(); renderApp(); };
   if ($("teledit")) $("teledit").onclick=()=>{ S.editTel=true; keepScroll(renderApp); const i=$("telin"); i && i.focus(); };
